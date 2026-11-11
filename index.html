@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>折り紙 展開図エディタ</title>
+<style>
+:root{color-scheme:light dark;--bg:#faf8f4;--fg:#222;--panel:#fff;--bd:#d9d4c8;--m:#d6372f;--v:#2468c8;--a:#8a8a8a;--err:#e11d1d;--ok:#16a05a;--paper:#fffdf6;--grid:#e6e0d2;--sel:#222;--selfg:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#eee;--panel:#24242a;--bd:#3a3a42;--m:#ff6b60;--v:#6aa5ff;--a:#9a9a9a;--err:#ff5555;--ok:#3ddc84;--paper:#2b2b31;--grid:#3a3a42;--sel:#eee;--selfg:#111}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#eee;--panel:#24242a;--bd:#3a3a42;--m:#ff6b60;--v:#6aa5ff;--a:#9a9a9a;--err:#ff5555;--ok:#3ddc84;--paper:#2b2b31;--grid:#3a3a42;--sel:#eee;--selfg:#111}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+.bar{display:flex;flex-wrap:wrap;gap:6px;padding:8px;align-items:center}
+button,select{min-height:44px;padding:0 12px;border:1px solid var(--bd);border-radius:10px;background:var(--panel);color:var(--fg);font-size:15px}
+button.on{background:var(--sel);color:var(--selfg);border-color:var(--sel)}
+.sw{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+#wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 8px}
+canvas{touch-action:none;border:1px solid var(--bd);border-radius:8px;background:var(--paper)}
+#st{padding:8px 12px;font-size:14px;line-height:1.6;min-height:4.8em}
+.ok{color:var(--ok);font-weight:700}.ng{color:var(--err);font-weight:700}
+#ttl{flex:1;min-width:120px;min-height:44px;padding:0 10px;border:1px solid var(--bd);border-radius:10px;background:var(--panel);color:var(--fg);font-size:16px}
+#lst{max-height:35vh;overflow:auto;margin:0 8px;border:1px solid var(--bd);border-radius:10px;background:var(--panel)}
+.it{display:flex;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--bd)}
+small{opacity:.7}
+#app{flex:1;min-height:0;display:flex}
+#side{width:150px;flex:none;overflow-y:auto;border-right:1px solid var(--bd)}
+#side .bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch}
+#side button,#side select{width:100%;text-align:left;font-size:14px}
+#side #ttl{flex:none;width:100%;min-width:0;box-sizing:border-box}
+#main{flex:1;min-width:0;display:flex;flex-direction:column}
+#side{width:236px}
+#side .bar{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#side select{grid-column:1/-1}
+#side button{padding:0 6px;font-size:13px}
+@media (max-width:600px){#side{width:196px}}
+</style>
+</head>
+<body>
+<div class="bar" id="top"><input id="ttl" placeholder="題名" maxlength="60"><button id="save">保存</button><button id="newd">新規</button><button id="opn">保存一覧</button><select id="df" aria-label="形式"><option value="svg">SVG</option><option value="png">PNG画像</option><option value="json">データ(JSON)</option></select><button id="dl">ダウンロード</button><span id="sv" style="font-size:13px"></span></div>
+<div id="app"><div id="side"><div class="bar">
+<button data-t="M" class="on"><span class="sw" style="border-color:var(--m);border-top-style:dashed"></span>山折り</button>
+<button data-t="V"><span class="sw" style="border-color:var(--v);border-top-style:dotted"></span>谷折り</button>
+<button data-t="A"><span class="sw" style="border-color:var(--a);border-top-width:1px"></span>補助線</button>
+<button data-t="E">区間を消す</button>
+<button data-t="EW">線ごと消す</button>
+<button data-t="B2">角2等分</button>
+<button data-t="B3">角3等分</button>
+<button data-t="P">垂線</button>
+<button data-t="X">線を延長</button>
+<select id="sm" aria-label="線の引き方"><option value="g">グリッド吸着</option><option value="a">角度吸着(22.5°刻み)</option></select>
+<select id="bt" aria-label="角度線の種類"><option value="M">山で</option><option value="V">谷で</option><option value="A">補助線で</option></select>
+<button id="tr" class="on" hidden>半透明</button>
+<button id="fold">折りたたみ表示</button>
+<select id="div" aria-label="分割数"><option value="4">4分割</option><option value="8" selected>8分割</option><option value="16">16分割</option><option value="32">32分割</option><option value="64">64分割</option></select>
+<button data-t="C">複製</button>
+<select id="cm" aria-label="複製の方法"><option value="v">縦の中心線で反転</option><option value="h">横の中心線で反転</option><option value="d1">対角線(左上→右下)で反転</option><option value="d2">対角線(右上→左下)で反転</option><option value="r90">点を中心に90°回転</option><option value="r180">点を中心に180°回転</option><option value="r45">点を中心に45°回転</option></select>
+<button id="tm" class="on">中点 □</button>
+<button id="tv" class="on">交点 ○</button>
+<button id="undo">元に戻す</button>
+<button id="clear">全消去</button>
+</div>
+
+</div>
+<div id="main">
+<div id="lst" hidden></div>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<div id="st"></div>
+</div></div>
+<script>
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),wrap=document.getElementById('wrap'),st=document.getElementById('st');
+let n=8,tool='M',strokes=[],hist=[],drag=null,S=300,pad=15,cell=10,dpr=1,pts=[],foldMode=false,foldPolys=[],baseFace=0;
+const key=p=>Math.round(p[0]*1e6)+','+Math.round(p[1]*1e6);
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const px=x=>pad+x*cell;
+function onSeg(p,a,b){const cr=(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);if(Math.abs(cr)>1e-9)return false;const d=(p[0]-a[0])*(b[0]-a[0])+(p[1]-a[1])*(b[1]-a[1]),L=(b[0]-a[0])**2+(b[1]-a[1])**2;return d>=-1e-9&&d<=L+1e-9}
+function build(all){
+  const E=new Map(),real=all?strokes:strokes.filter(s=>s.t!=='A');
+  for(const s of real){
+    const a=s.a,b=s.b,dx=b[0]-a[0],dy=b[1]-a[1],L=dx*dx+dy*dy,pts=[[a,0],[b,1]];
+    for(const o of real){
+      if(o===s)continue;
+      for(const p of [o.a,o.b])if(onSeg(p,a,b))pts.push([p,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L]);
+      const ex=o.b[0]-o.a[0],ey=o.b[1]-o.a[1],den=dx*ey-dy*ex;
+      if(Math.abs(den)>1e-12){
+        const t=((o.a[0]-a[0])*ey-(o.a[1]-a[1])*ex)/den,u=((o.a[0]-a[0])*dy-(o.a[1]-a[1])*dx)/den;
+        if(t>-1e-9&&t<1+1e-9&&u>-1e-9&&u<1+1e-9)pts.push([[a[0]+t*dx,a[1]+t*dy],t]);
+      }
+    }
+    pts.sort((p,q)=>p[1]-q[1]);
+    for(let i=0;i<pts.length-1;i++){
+      const p=pts[i][0],q=pts[i+1][0],k1=key(p),k2=key(q);
+      if(k1===k2)continue;
+      E.set(k1<k2?k1+'|'+k2:k2+'|'+k1,{p,q,t:s.t});
+    }
+  }
+  return [...E.values()];
+}
+function analyze(edges){
+  const V=new Map();
+  const add=(p,q,t)=>{const k=key(p);if(!V.has(k))V.set(k,{x:p[0],y:p[1],e:[]});V.get(k).e.push({a:Math.atan2(q[1]-p[1],q[0]-p[0]),t})};
+  edges.forEach(e=>{add(e.p,e.q,e.t);add(e.q,e.p,e.t)});
+  const res=[];
+  for(const v of V.values()){
+    if(v.x<1e-9||v.y<1e-9||v.x>n-1e-9||v.y>n-1e-9){res.push({v,bd:true,ok:true,r:[]});continue}
+    const r=[],d=v.e.length;
+    if(d%2)r.push('線の数が奇数('+d+'本)');
+    else{
+      const m=v.e.filter(e=>e.t==='M').length,vl=d-m;
+      if(Math.abs(m-vl)!==2)r.push('山'+m+'本・谷'+vl+'本(前川定理:差は2)');
+      const as=v.e.map(e=>e.a).sort((x,y)=>x-y);let s0=0;
+      for(let i=0;i<d;i++){const nx=i+1<d?as[i+1]:as[0]+2*Math.PI;if(i%2===0)s0+=nx-as[i]}
+      if(Math.abs(s0-Math.PI)>1e-6)r.push('角度の交互和が180°でない(川崎定理)');
+    }
+    res.push({v,ok:!r.length,r});
+  }
+  return res;
+}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,S,S);
+  const g=css('--grid'),M=css('--m'),Vc=css('--v'),A=css('--a'),ER=css('--err'),OK=css('--ok'),fg=css('--fg');
+  ctx.strokeStyle=g;ctx.lineWidth=1;
+  for(let i=0;i<=n;i++){ctx.beginPath();ctx.moveTo(px(i),px(0));ctx.lineTo(px(i),px(n));ctx.moveTo(px(0),px(i));ctx.lineTo(px(n),px(i));ctx.stroke()}
+  ctx.strokeStyle=fg;ctx.lineWidth=2;ctx.strokeRect(px(0),px(0),n*cell,n*cell);
+  const line=(a,b,c,w,dash)=>{ctx.strokeStyle=c;ctx.lineWidth=w;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(px(a[0]),px(a[1]));ctx.lineTo(px(b[0]),px(b[1]));ctx.stroke();ctx.setLineDash([])};
+  strokes.filter(s=>s.t==='A').forEach(s=>line(s.a,s.b,A,1,[]));
+  const edges=build();
+  edges.forEach(e=>line(e.p,e.q,e.t==='M'?M:Vc,2.5,e.t==='M'?[10,4,2,4]:[6,5]));
+  if(drag&&tool!=='E')line(drag.a,drag.b,tool==='M'?M:tool==='V'?Vc:A,tool==='A'?1:2.5,[4,4]);
+  const an=analyze(edges),bad=an.filter(a=>!a.ok);
+  an.forEach(a=>{
+    if(a.bd||!showVtx)return;
+    ctx.beginPath();
+    if(a.ok){ctx.fillStyle=OK;ctx.arc(px(a.v.x),px(a.v.y),4,0,7);ctx.fill()}
+    else{ctx.strokeStyle=ER;ctx.lineWidth=3;ctx.arc(px(a.v.x),px(a.v.y),9,0,7);ctx.stroke()}
+  });
+  const f=x=>Math.round(x*100)/100;
+  if(!edges.length)st.innerHTML='格子点から格子点へ線を引いてください。内部の頂点は、すべて平らに折れる条件を満たすと緑、満たさないと赤の丸で示されます。';
+  else if(!bad.length)st.innerHTML='<span class="ok">すべての頂点が条件を満たしています</span><br>(各頂点で平坦に折れるための必要条件です。紙全体の重なり順までは判定していません)';
+  else st.innerHTML='<span class="ng">条件を満たさない頂点: '+bad.length+'個</span><br>'+bad.slice(0,3).map(b=>'('+f(b.v.x)+', '+f(b.v.y)+') '+b.r.join(' / ')).join('<br>');
+}
+function pos(e){const r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]}
+let ip=[];
+function endPt(e){
+  if(document.getElementById('sm').value==='g')return snap(e);
+  const a=drag.a,[x,y]=pos(e),dx=(x-pad)/cell-a[0],dy=(y-pad)/cell-a[1];
+  if(Math.hypot(dx,dy)<1e-6)return a;
+  const bases=[0];for(const s of strokes)if(onSeg(a,s.a,s.b))bases.push(Math.atan2(s.b[1]-s.a[1],s.b[0]-s.a[0]));
+  const step=Math.PI/8,cur=Math.atan2(dy,dx),z=v=>Math.abs(v)<1e-9?0:v;let ang=0,bestD=9;
+  for(const b of bases){const cand=b+Math.round((cur-b)/step)*step,d=Math.abs(Math.atan2(Math.sin(cur-cand),Math.cos(cur-cand)));if(d<bestD){bestD=d;ang=cand}}
+  const ux=z(Math.cos(ang)),uy=z(Math.sin(ang));
+  let tm=Infinity;
+  for(const [c,d] of [[a[0],ux],[a[1],uy]]){if(d>1e-12)tm=Math.min(tm,(n-c)/d);else if(d<-1e-12)tm=Math.min(tm,-c/d)}
+  const len=Math.min(Math.max(0,dx*ux+dy*uy),tm),C=[tm];
+  for(const s of strokes){
+    const ex=s.b[0]-s.a[0],ey=s.b[1]-s.a[1],den=ux*ey-uy*ex;
+    if(Math.abs(den)<1e-12)continue;
+    const t=((s.a[0]-a[0])*ey-(s.a[1]-a[1])*ex)/den,w=((s.a[0]-a[0])*uy-(s.a[1]-a[1])*ux)/den;
+    if(t>1e-9&&t<=tm+1e-9&&w>=-1e-9&&w<=1+1e-9)C.push(t);
+  }
+  const on=q=>{const rx=q[0]-a[0],ry=q[1]-a[1],t=rx*ux+ry*uy;if(Math.abs(rx*uy-ry*ux)<1e-9&&t>1e-9&&t<=tm+1e-9)C.push(t)};
+  ip.forEach(on);
+  for(let i=0;i<=n;i++)for(let j=0;j<=n;j++)on([i,j]);
+  let bestT=len,bd=14/cell;
+  C.forEach(t=>{const d=Math.abs(t-len);if(d<bd){bd=d;bestT=t}});
+  return [a[0]+ux*bestT,a[1]+uy*bestT];
+}
+function clipRect(a,b){
+  let t0=0,t1=1;const dx=b[0]-a[0],dy=b[1]-a[1];
+  for(const [p,q] of [[-dx,a[0]],[dx,n-a[0]],[-dy,a[1]],[dy,n-a[1]]]){
+    if(Math.abs(p)<1e-12){if(q<-1e-9)return null}
+    else{const r=q/p;if(p<0){if(r>t1)return null;if(r>t0)t0=r}else{if(r<t0)return null;if(r<t1)t1=r}}
+  }
+  if(t1-t0<1e-9)return null;
+  return [[a[0]+t0*dx,a[1]+t0*dy],[a[0]+t1*dx,a[1]+t1*dy]];
+}
+function copyXform(p){
+  const m=document.getElementById('cm').value,add=[],sn=v=>Math.abs(v)<1e-9?0:Math.abs(v-n)<1e-9?n:v,pt=q=>[sn(q[0]),sn(q[1])];
+  const onB=(a,b)=>[0,1].some(k=>[0,n].some(v=>Math.abs(a[k]-v)<1e-9&&Math.abs(b[k]-v)<1e-9));
+  const push=(a,b,t)=>{const A=pt(a),B=pt(b);if(Math.hypot(A[0]-B[0],A[1]-B[1])>1e-6&&!onB(A,B))add.push({a:A,b:B,t})};
+  if(m[0]==='r'){
+    const th=+m.slice(1)*Math.PI/180,co=Math.cos(th),si=Math.sin(th),rot=q=>[p[0]+co*(q[0]-p[0])-si*(q[1]-p[1]),p[1]+si*(q[0]-p[0])+co*(q[1]-p[1])];
+    strokes.forEach(s=>{const c=clipRect(rot(s.a),rot(s.b));if(c)push(c[0],c[1],s.t)});
+  }else{
+    const ax={v:[[n/2,0],[0,1]],h:[[0,n/2],[1,0]],d1:[[0,0],[Math.SQRT1_2,Math.SQRT1_2]],d2:[[n,0],[-Math.SQRT1_2,Math.SQRT1_2]]}[m],O=ax[0],u=ax[1];
+    const side=q=>u[0]*(q[1]-O[1])-u[1]*(q[0]-O[0]),sg=Math.sign(side(p));
+    if(!sg)return;
+    const ref=q=>{const dx=q[0]-O[0],dy=q[1]-O[1],k=dx*u[0]+dy*u[1];return [2*(O[0]+k*u[0])-q[0],2*(O[1]+k*u[1])-q[1]]};
+    strokes.forEach(s=>{
+      const sa=sg*side(s.a),sb=sg*side(s.b);let a=s.a,b=s.b;
+      if(sa<=1e-9&&sb<=1e-9)return;
+      if(sa<-1e-9||sb<-1e-9){const t=sa/(sa-sb),x=[s.a[0]+t*(s.b[0]-s.a[0]),s.a[1]+t*(s.b[1]-s.a[1])];if(sa<0)a=x;else b=x}
+      push(ref(a),ref(b),s.t);
+    });
+  }
+  if(!add.length)return;
+  snapshot();strokes=strokes.concat(add);
+}
+document.getElementById('cm').onchange=()=>document.getElementById('cm').previousElementSibling.click();
+function perp(P,s){
+  const t=document.getElementById('bt').value,dx=-(s.b[1]-s.a[1]),dy=s.b[0]-s.a[0];
+  const hit=k=>{let tm=Infinity;for(const [c,d] of [[P[0],dx*k],[P[1],dy*k]]){if(d>1e-12)tm=Math.min(tm,(n-c)/d);else if(d<-1e-12)tm=Math.min(tm,-c/d)}return tm};
+  const f=hit(1),b=hit(-1);
+  if(!isFinite(f)||!isFinite(b))return;
+  const A=[P[0]-dx*b,P[1]-dy*b],B=[P[0]+dx*f,P[1]+dy*f];
+  if(onBorder(A,B))return;
+  snapshot();strokes.push({a:A,b:B,t});
+}
+function extend(){
+  const [p1,p2]=pts,t=document.getElementById('bt').value,dx=p2[0]-p1[0],dy=p2[1]-p1[1];
+  if(Math.hypot(dx,dy)<1e-9)return;
+  const hit=s=>{let tm=Infinity;for(const [c,d] of [[p1[0],dx*s],[p1[1],dy*s]]){if(d>1e-12)tm=Math.min(tm,(n-c)/d);else if(d<-1e-12)tm=Math.min(tm,-c/d)}return tm};
+  const f=hit(1),b=hit(-1);
+  if(!isFinite(f)||!isFinite(b))return;
+  const A=[p1[0]-dx*b,p1[1]-dy*b],B=[p1[0]+dx*f,p1[1]+dy*f];
+  if(onBorder(A,B))return;
+  snapshot();strokes.push({a:A,b:B,t});
+}
+function ipoints(){
+  const r=[],L=strokes;
+  L.forEach(s=>r.push(s.a,s.b));
+  build(true).forEach(g=>r.push([(g.p[0]+g.q[0])/2,(g.p[1]+g.q[1])/2]));
+  for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){
+    const a=L[i].a,b=L[i].b,c=L[j].a,d=L[j].b,dx=b[0]-a[0],dy=b[1]-a[1],ex=d[0]-c[0],ey=d[1]-c[1],den=dx*ey-dy*ex;
+    if(Math.abs(den)<1e-12)continue;
+    const t=((c[0]-a[0])*ey-(c[1]-a[1])*ex)/den,u=((c[0]-a[0])*dy-(c[1]-a[1])*dx)/den;
+    if(t>1e-9&&t<1-1e-9&&u>1e-9&&u<1-1e-9)r.push([a[0]+t*dx,a[1]+t*dy]);
+  }
+  return r;
+}
+function snap(e){
+  const [x,y]=pos(e),c=v=>Math.max(0,Math.min(n,Math.round((v-pad)/cell))),g=[c(x),c(y)];
+  let best=g,bd=Math.hypot(px(g[0])-x,px(g[1])-y);
+  for(const q of ip){const d=Math.hypot(px(q[0])-x,px(q[1])-y);if(d<bd-1e-6){bd=d;best=q}}
+  return best;
+}
+const onBorder=(a,b)=>(a[0]===b[0]&&(a[0]===0||a[0]===n))||(a[1]===b[1]&&(a[1]===0||a[1]===n));
+function dist(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy)));return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)}
+const snapshot=()=>{hist.push(JSON.stringify(strokes));if(hist.length>100)hist.shift()};
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);
+  ip=ipoints();
+  if(foldMode){const q=pos(e),h=foldPolys.filter(f=>inPoly(q,f.poly)).pop();if(h){baseFace=h.i;draw()}return}
+  if(tool==='C'){copyXform(snap(e));draw();return}
+  if(tool==='P'){
+    if(!pts.length)pts.push(snap(e));
+    else{const [x,y]=pos(e),q=[(x-pad)/cell,(y-pad)/cell];let bs=null,bd=Math.max(0.5,12/cell);strokes.forEach(s=>{const d=dist(q,s.a,s.b);if(d<bd){bd=d;bs=s}});if(bs){perp(pts[0],bs);pts=[]}}
+    draw();return}
+  if(tool==='X'){pts.push(snap(e));if(pts.length===2){extend();pts=[]}draw();return}
+  if(tool[0]==='B'){pts.push(snap(e));if(pts.length===3){bisect();pts=[]}draw();return}
+  if(tool==='E'){
+    const [x,y]=pos(e),p=[(x-pad)/cell,(y-pad)/cell];let be=null,bd=Math.max(0.4,12/cell),ba=-1;
+    build().forEach(g=>{const d=dist(p,g.p,g.q);if(d<bd){bd=d;be=g;ba=-1}});
+    strokes.forEach((s,i)=>{if(s.t==='A'){const d=dist(p,s.a,s.b);if(d<bd){bd=d;be=null;ba=i}}});
+    if(ba>=0){snapshot();strokes.splice(ba,1);draw()}
+    else if(be){
+      snapshot();const ns=[];
+      for(const s of strokes){
+        if(s.t==='A'||!onSeg(be.p,s.a,s.b)||!onSeg(be.q,s.a,s.b)){ns.push(s);continue}
+        const dx=s.b[0]-s.a[0],dy=s.b[1]-s.a[1],L=dx*dx+dy*dy,pr=q=>((q[0]-s.a[0])*dx+(q[1]-s.a[1])*dy)/L;
+        const [lo,hi]=pr(be.p)<pr(be.q)?[be.p,be.q]:[be.q,be.p];
+        if(pr(lo)>1e-9)ns.push({a:s.a,b:lo,t:s.t});
+        if(pr(hi)<1-1e-9)ns.push({a:hi,b:s.b,t:s.t});
+      }
+      strokes=ns;draw();
+    }
+    return;
+  }
+  if(tool==='EW'){
+    const [x,y]=pos(e),p=[(x-pad)/cell,(y-pad)/cell];let bi=-1,bd=Math.max(0.4,12/cell);
+    strokes.forEach((s,i)=>{const d=dist(p,s.a,s.b);if(d<bd){bd=d;bi=i}});
+    if(bi>=0){snapshot();strokes.splice(bi,1);draw()}
+    return;
+  }
+  const p=snap(e);drag={a:p,b:p};draw();
+});
+cv.addEventListener('pointermove',e=>{if(drag){drag.b=endPt(e);draw()}});
+cv.addEventListener('pointerup',()=>{
+  if(drag&&Math.hypot(drag.b[0]-drag.a[0],drag.b[1]-drag.a[1])>1e-6&&!onBorder(drag.a,drag.b)){snapshot();strokes.push({a:drag.a,b:drag.b,t:tool})}
+  drag=null;draw();
+});
+cv.addEventListener('pointercancel',()=>{drag=null;draw()});
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tool=b.dataset.t;pts=[];if(foldMode)document.getElementById('fold').click();else draw();document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b))});
+const $=id=>document.getElementById(id);
+let store=null,curId=null;
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const msg=t=>{$('sv').textContent=t};
+async function initStore(){
+  msg('読み込み中…');
+  try{
+    if(typeof claude!=='undefined'){
+      const r=await Promise.race([Promise.all([claude.use('db'),claude.use('user')]),new Promise(res=>setTimeout(()=>res(null),6000))]);
+      if(r&&r[0]&&r[1]){
+        const uid=await r[1].id();
+        if(uid){
+          const col=r[0].collection('data/users/'+uid);
+          store={kind:'cloud',
+            list:async()=>(await col.get()).docs.map(d=>({id:d.id,...d.data()})),
+            put:async(id,o)=>{await col.doc(id).set(o)},
+            del:async id=>{await col.doc(id).delete()}};
+        }
+      }
+    }
+  }catch(e){store=null}
+  if(!store){
+    const K='origami_cp_designs',rd=()=>{try{return JSON.parse(localStorage.getItem(K)||'{}')}catch(e){return {}}};
+    store={kind:'local',
+      list:async()=>Object.entries(rd()).map(([id,o])=>({id,...o})),
+      put:async(id,o)=>{const m=rd();m[id]=o;localStorage.setItem(K,JSON.stringify(m))},
+      del:async id=>{const m=rd();delete m[id];localStorage.setItem(K,JSON.stringify(m))}};
+  }
+  msg(store.kind==='cloud'?'':'この端末のブラウザに保存します');
+}
+async function showList(){
+  const box=$('lst');box.hidden=false;box.textContent='読み込み中…';
+  let L=[];
+  try{L=await store.list()}catch(e){box.textContent='読み込めませんでした';return}
+  L.sort((a,b)=>(b.updated||0)-(a.updated||0));
+  box.innerHTML=L.length?'':'<div class="it">保存したものはまだありません</div>';
+  L.forEach(o=>{
+    const r=document.createElement('div'),b1=document.createElement('button'),b2=document.createElement('button');
+    r.className='it';
+    r.innerHTML='<span style="flex:1">'+esc(o.title||'無題')+' <small>('+esc(o.n)+'分割 '+new Date(o.updated||0).toLocaleDateString('ja-JP')+')</small></span>';
+    b1.textContent='開く';b2.textContent='削除';
+    b1.onclick=()=>{
+      try{strokes=JSON.parse(o.strokes)}catch(e){strokes=[]}
+      n=+o.n||8;$('div').value=String(n);curId=o.id;$('ttl').value=o.title||'';hist=[];pts=[];
+      if(foldMode)$('fold').click();
+      box.hidden=true;layout();msg('開きました。修正したら「保存」で上書きします');
+    };
+    let sure=false;
+    b2.onclick=async()=>{
+      if(!sure){sure=true;b2.textContent='本当に削除';return}
+      try{await store.del(o.id);if(curId===o.id)curId=null;showList()}catch(e){msg('削除できませんでした')}
+    };
+    r.append(b1,b2);box.append(r);
+  });
+}
+let trans=true,showMid=true,showVtx=true;
+$('tr').onclick=()=>{trans=!trans;$('tr').classList.toggle('on',trans);draw()};
+$('tm').onclick=()=>{showMid=!showMid;$('tm').classList.toggle('on',showMid);draw()};
+$('tv').onclick=()=>{showVtx=!showVtx;$('tv').classList.toggle('on',showVtx);draw()};
+const XC={M:'#d6372f',V:'#2468c8',A:'#8a8a8a'},XD={M:[10,4,2,4],V:[6,5],A:[]};
+function exportSvg(){
+  const W=1000,m=40,sc=(W-2*m)/n,X=v=>(m+v*sc).toFixed(2);
+  let s=`<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${W}' viewBox='0 0 ${W} ${W}'><rect width='${W}' height='${W}' fill='#fff'/><rect x='${m}' y='${m}' width='${n*sc}' height='${n*sc}' fill='none' stroke='#000' stroke-width='3'/>`;
+  for(const t of ['A','V','M'])strokes.filter(q=>q.t===t).forEach(q=>{s+=`<line x1='${X(q.a[0])}' y1='${X(q.a[1])}' x2='${X(q.b[0])}' y2='${X(q.b[1])}' stroke='${XC[t]}' stroke-width='${t==='A'?1.5:3}'${XD[t].length?` stroke-dasharray='${XD[t].join(' ')}'`:''}/>`});
+  return s+'</svg>';
+}
+function exportPng(){
+  return new Promise(res=>{
+    const W=1200,m=48,sc=(W-2*m)/n,c=document.createElement('canvas');c.width=c.height=W;
+    const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,W);g.strokeStyle='#000';g.lineWidth=4;g.strokeRect(m,m,n*sc,n*sc);
+    for(const t of ['A','V','M']){
+      g.strokeStyle=XC[t];g.lineWidth=t==='A'?2:4;g.setLineDash(XD[t].map(v=>v*1.6));
+      strokes.filter(q=>q.t===t).forEach(q=>{g.beginPath();g.moveTo(m+q.a[0]*sc,m+q.a[1]*sc);g.lineTo(m+q.b[0]*sc,m+q.b[1]*sc);g.stroke()});
+    }
+    c.toBlob(res,'image/png');
+  });
+}
+$('dl').onclick=async()=>{
+  if(!strokes.length){msg('ダウンロードする線がありません');return}
+  const f=$('df').value,base=($('ttl').value.trim()||'展開図').replace(/[/:*?<>|]/g,'_');
+  try{
+    const dn=typeof claude==='undefined'?null:await claude.use('downloads');
+    if(!dn&&typeof claude!=='undefined'){msg('この画面ではダウンロードできません');return}
+    const data=f==='svg'?exportSvg():f==='png'?await exportPng():JSON.stringify({title:$('ttl').value.trim(),n,strokes},null,1);
+    if(dn)await dn.save({filename:base+'.'+f,data});else{const a=document.createElement('a');a.href=URL.createObjectURL(data instanceof Blob?data:new Blob([data]));a.download=base+'.'+f;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+    msg('ダウンロードしました');
+  }catch(e){msg(e&&e.code==='declined'?'キャンセルしました':e&&e.code==='extension_not_enabled'?'この形式は使えません':'ダウンロードできませんでした')}
+};
+$('save').onclick=async()=>{
+  if(!store)return;
+  const title=$('ttl').value.trim()||'無題',id=curId||'d'+Date.now().toString(36);
+  try{
+    await store.put(id,{title,n,strokes:JSON.stringify(strokes),updated:Date.now()});
+    curId=id;$('ttl').value=title;msg('保存しました');
+    if(!$('lst').hidden)showList();
+  }catch(e){msg('保存できませんでした')}
+};
+$('newd').onclick=()=>{curId=null;$('ttl').value='';strokes=[];hist=[];pts=[];if(foldMode)$('fold').click();else draw();msg('新規作成')};
+$('opn').onclick=()=>{if(!store)return;const b=$('lst');if(b.hidden)showList();else b.hidden=true};
+document.getElementById('fold').onclick=e=>{foldMode=!foldMode;$('tr').hidden=!foldMode;baseFace=0;pts=[];e.target.classList.toggle('on',foldMode);e.target.textContent=foldMode?'展開図に戻る':'折りたたみ表示';draw()};
+const inPoly=(p,poly)=>{let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c};
+function bisect(){
+  const [p1,v,p2]=pts,m=tool==='B2'?2:3,t=document.getElementById('bt').value;
+  if((p1[0]===v[0]&&p1[1]===v[1])||(p2[0]===v[0]&&p2[1]===v[1]))return;
+  const a1=Math.atan2(p1[1]-v[1],p1[0]-v[0]),a2=Math.atan2(p2[1]-v[1],p2[0]-v[0]);
+  let d=a2-a1;while(d>Math.PI)d-=2*Math.PI;while(d<=-Math.PI)d+=2*Math.PI;
+  if(Math.abs(Math.abs(d)-Math.PI)<1e-9||Math.abs(d)<1e-9)return;
+  snapshot();
+  for(let k=1;k<m;k++){
+    const a=a1+d*k/m,dx=Math.cos(a),dy=Math.sin(a);let tm=Infinity;
+    for(const [c,dd] of [[v[0],dx],[v[1],dy]]){if(dd>1e-12)tm=Math.min(tm,(n-c)/dd);else if(dd<-1e-12)tm=Math.min(tm,-c/dd)}
+    if(isFinite(tm)&&tm>1e-9)strokes.push({a:v,b:[v[0]+dx*tm,v[1]+dy*tm],t});
+  }
+}
+function faces(){
+  const vp=new Map(),segs=[],P=p=>{const k=key(p);if(!vp.has(k))vp.set(k,p);return k};
+  build().forEach(e=>segs.push([P(e.p),P(e.q),e.t]));
+  [[0,0],[n,0],[n,n],[0,n]].forEach(P);
+  [p=>p[1]<1e-9?p[0]:null,p=>p[0]>n-1e-9?p[1]:null,p=>p[1]>n-1e-9?p[0]:null,p=>p[0]<1e-9?p[1]:null].forEach(f=>{
+    const l=[...vp.values()].filter(p=>f(p)!==null).sort((a,b)=>f(a)-f(b));
+    for(let i=0;i<l.length-1;i++)segs.push([key(l[i]),key(l[i+1]),'B']);
+  });
+  const out=new Map();vp.forEach((p,k)=>out.set(k,[]));
+  segs.forEach(([a,b,t])=>{
+    if(a===b)return;const pa=vp.get(a),pb=vp.get(b);
+    const h1={u:a,v:b,t,ang:Math.atan2(pb[1]-pa[1],pb[0]-pa[0]),f:-1},h2={u:b,v:a,t,ang:Math.atan2(pa[1]-pb[1],pa[0]-pb[0]),f:-1};
+    h1.tw=h2;h2.tw=h1;out.get(a).push(h1);out.get(b).push(h2);
+  });
+  out.forEach(l=>l.sort((x,y)=>x.ang-y.ang));
+  const F=[];
+  out.forEach(l=>l.forEach(h=>{
+    if(h.f>=0)return;
+    const poly=[],id=F.length;let c=h,g=0,area=0;
+    do{c.f=id;poly.push(vp.get(c.u));const l2=out.get(c.v),i=l2.indexOf(c.tw);c=l2[(i-1+l2.length)%l2.length]}while(c!==h&&++g<5000);
+    for(let i=0;i<poly.length;i++){const p=poly[i],q=poly[(i+1)%poly.length];area+=p[0]*q[1]-q[0]*p[1]}
+    F.push({poly,area:area/2});
+  }));
+  return {F,out,vp};
+}
+function fold(base){
+  const {F,out,vp}=faces(),inner=F.map(f=>f.area>1e-9),adj=F.map(()=>[]);
+  out.forEach(l=>l.forEach(h=>{if((h.t==='M'||h.t==='V')&&inner[h.f]&&inner[h.tw.f])adj[h.f].push(h)}));
+  const T=[],q=[],b=inner[base]?base:inner.indexOf(true),ap=(M,p)=>[M[0]*p[0]+M[1]*p[1]+M[4],M[2]*p[0]+M[3]*p[1]+M[5]];
+  let bad=0;T[b]=[1,0,0,1,0,0];q.push(b);
+  while(q.length){
+    const i=q.shift(),Fm=T[i];
+    for(const h of adj[i]){
+      const j=h.tw.f,pa=vp.get(h.u),pb=vp.get(h.v),L=Math.hypot(pb[0]-pa[0],pb[1]-pa[1]),ux=(pb[0]-pa[0])/L,uy=(pb[1]-pa[1])/L,dot=ux*pa[0]+uy*pa[1];
+      const aR=2*ux*ux-1,bR=2*ux*uy,dR=2*uy*uy-1,eR=2*(pa[0]-dot*ux),fR=2*(pa[1]-dot*uy);
+      const N=[Fm[0]*aR+Fm[1]*bR,Fm[0]*bR+Fm[1]*dR,Fm[2]*aR+Fm[3]*bR,Fm[2]*bR+Fm[3]*dR,Fm[0]*eR+Fm[1]*fR+Fm[4],Fm[2]*eR+Fm[3]*fR+Fm[5]];
+      if(!T[j]){T[j]=N;q.push(j)}
+      else for(const p of [pa,pb]){const x=ap(T[j],p),y=ap(N,p);if(Math.hypot(x[0]-y[0],x[1]-y[1])>1e-6){bad++;break}}
+    }
+  }
+  return {F,T,bad,b};
+}
+function drawFold(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,S,S);foldPolys=[];
+  const r=fold(baseFace),L=[];
+  r.F.forEach((f,i)=>{if(r.T[i])L.push({i,poly:f.poly.map(p=>[r.T[i][0]*p[0]+r.T[i][1]*p[1]+r.T[i][4],r.T[i][2]*p[0]+r.T[i][3]*p[1]+r.T[i][5]]),front:r.T[i][0]*r.T[i][3]-r.T[i][1]*r.T[i][2]>0})});
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  L.forEach(f=>f.poly.forEach(p=>{x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])}));
+  const m=S*0.1,sc=Math.min((S-2*m)/Math.max(x1-x0,1e-6),(S-2*m)/Math.max(y1-y0,1e-6)),ox=(S-sc*(x1-x0))/2-sc*x0,oy=(S-sc*(y1-y0))/2-sc*y0;
+  ctx.lineWidth=1.5;ctx.strokeStyle=css('--fg');
+  L.forEach(f=>{
+    f.poly=f.poly.map(p=>[ox+sc*p[0],oy+sc*p[1]]);foldPolys.push(f);
+    ctx.fillStyle=trans?(f.front?'rgba(70,130,230,0.4)':'rgba(240,160,40,0.4)'):(f.front?'rgb(130,170,235)':'rgb(240,195,110)');
+    ctx.beginPath();f.poly.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();ctx.stroke();
+  });
+  st.innerHTML=(r.bad?'<span class="ng">全体として平らに折れません(面の位置が矛盾する折り目が '+r.bad+' か所)</span>':'<span class="ok">全体の形は矛盾なく平らに折りたためます</span>')+'<br>青=表、橙=裏。面をタップすると、その面を土台(動かさない面)にします。重なる順番までは判定せず、'+(trans?'半透明で重ねて表示しています。':'不透明で表示しています。重なる順番は面の並び順で、実際の上下とは異なります。')+'';
+}
+const draw0=draw;
+draw=function(){
+  if(foldMode){drawFold();return}
+  draw0();
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.strokeStyle=css('--a');ctx.lineWidth=1.5;
+  if(showMid)build(true).forEach(g=>{const x=px((g.p[0]+g.q[0])/2),y=px((g.p[1]+g.q[1])/2);ctx.strokeRect(x-3,y-3,6,6)});
+  ctx.fillStyle=css('--fg');
+  pts.forEach(p=>{ctx.beginPath();ctx.arc(px(p[0]),px(p[1]),6,0,7);ctx.fill()});
+  if(tool==='C')st.innerHTML='<b>'+(document.getElementById('cm').value[0]==='r'?'回転の中心にする点をタップ(全体を回転して複製します)':'複製元にする側をタップ(その側の線を反対側へ複製します)')+'</b><br>'+st.innerHTML;
+  if(tool==='P')st.innerHTML='<b>'+['①垂線を通す点をタップ','②基準にする線をタップ'][pts.length]+'</b><br>'+st.innerHTML;
+  if(tool==='X')st.innerHTML='<b>'+['①延長する線の1点目をタップ','②2点目をタップ(2点を通る線を紙の端まで引きます)'][pts.length]+'</b><br>'+st.innerHTML;
+  if(tool[0]==='B')st.innerHTML='<b>'+['①角の片方の腕の上の点をタップ','②角の頂点をタップ','③もう片方の腕の上の点をタップ'][pts.length]+'</b><br>'+st.innerHTML;
+};
+document.getElementById('undo').onclick=()=>{if(hist.length){strokes=JSON.parse(hist.pop());draw()}};
+document.getElementById('clear').onclick=()=>{if(strokes.length){snapshot();strokes=[];draw()}};
+document.getElementById('div').onchange=e=>{n=+e.target.value;strokes=[];hist=[];layout()};
+function layout(){
+  const r=wrap.getBoundingClientRect();S=Math.max(200,Math.floor(Math.min(r.width-16,r.height-8)));
+  dpr=window.devicePixelRatio||1;cv.style.width=cv.style.height=S+'px';cv.width=cv.height=S*dpr;
+  pad=Math.max(14,S*0.04);cell=(S-2*pad)/n;draw();
+}
+new ResizeObserver(layout).observe(wrap);
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
+layout();
+initStore();
+</script>
+</body>
+</html>
